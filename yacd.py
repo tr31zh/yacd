@@ -69,44 +69,117 @@ df_world = (
     .reset_index()
     .assign(country_region="World", lat=np.nan, long=np.nan)
 )
-df = pd.concat((df_merged, df_world)).sort_values(["country_region", "date"])
+df_all = pd.concat((df_merged, df_world)).sort_values(["country_region", "date"])
+
+# Remove regions
+df_no_region = (
+    df_all.drop(columns=["province_state"])
+    .groupby(["country_region", "date"])
+    .sum()
+    .reset_index()
+)
+
+# Add columns
+df_new_column = (
+    df_no_region.assign(confirmed_total=df_no_region.confirmed)
+    .assign(recovered_total=df_no_region.recovered)
+    .assign(dead_total=df_no_region.dead)
+    .assign(country=df_no_region.country_region)
+    .assign(
+        confirmed_daily=df_no_region.confirmed.subtract(
+            df_no_region.confirmed.shift(1), fill_value=0
+        ).clip(0)
+    )
+    .assign(
+        recovered_daily=df_no_region.recovered.subtract(
+            df_no_region.recovered.shift(1), fill_value=0
+        ).clip(0)
+    )
+    .assign(
+        dead_daily=df_no_region.dead.subtract(df_no_region.dead.shift(1), fill_value=0).clip(0)
+    )
+    .drop(columns=["confirmed", "recovered", "dead", "country_region"])
+)
+
+df = df_new_column[
+    [
+        "country",
+        "date",
+        "lat",
+        "long",
+        "confirmed_total",
+        "confirmed_daily",
+        "recovered_total",
+        "recovered_daily",
+        "dead_total",
+        "dead_daily",
+    ]
+]
 
 # Set recovered to int
-df.recovered = df.recovered.fillna(-1)
-df.recovered = pd.to_numeric(df.recovered, downcast="integer")
-df.recovered = df.recovered.replace(-1, np.nan)
+df.recovered_total = df.recovered_total.fillna(-1)
+df.recovered_total = pd.to_numeric(df.recovered_total, downcast="integer")
+df.recovered_total = df.recovered_total.replace(-1, np.nan)
 
 # Begin Dashboard
 # external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
-external_stylesheets = ["https://codepen.io/anon/pen/mardKv.css"]
+# external_stylesheets = ["https://codepen.io/anon/pen/mardKv.css"]
+external_stylesheets = dbc.themes.BOOTSTRAP
 
 # app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets=[external_stylesheets])
 
-title = html.H1(children="YACD",)
+layout_style = {
+    "border": "1px solid #B3B6B7",
+    # "padding": "4px",
+    "background-color": "white",
+}
+text_layout = layout_style.copy()
+text_layout["text-align"] = "center"
+
+title = html.H1(children="YACD - Yet Another COVID-19 dashboard", style=text_layout,)
 description = dcc.Markdown(
     children="""
         Yet another COVID-19 dashboard built by yet another data science enthusiast.  
         I made this so I can look at the data the way I like.  
         Please feel free to fork, modify and distribute.""",
+    style=layout_style,
 )
 
-header = dbc.Row([dbc.Col(title), dbc.Col(description)])
+header = dbc.Row(
+    [
+        dbc.Col(title, width={"size": 5}),
+        # dbc.Col(description, width={"size": "auto"}),
+    ],
+    align="center",
+    justify="center",
+    style={"height": "10vh"},
+)
 
 all_columns = df.columns.to_list()
 num_columns = df.select_dtypes([np.int64, np.float64, np.datetime64]).columns.to_list()
 cat_columns = df.select_dtypes([np.object, np.datetime64]).columns.to_list()
-side_bar_label_width = 3
+side_bar_label_width = 4
 side_bar = dbc.Col(
     [
+        dbc.Row(html.Label("")),
         dbc.Row(
             [
                 dbc.Col(html.Label("Countries:"), width=side_bar_label_width),
                 dbc.Col(
                     dcc.Dropdown(
                         id="selected_countries",
-                        options=[{"label": i, "value": i} for i in df.country_region.unique()],
-                        value="World",
+                        options=[{"label": i, "value": i} for i in df.country.unique()],
+                        value=[
+                            "World",
+                            "France",
+                            "Spain",
+                            "Italy",
+                            "Germany",
+                            "US",
+                            "United Kingdom",
+                            "China",
+                        ],
                         multi=True,
                     )
                 ),
@@ -118,7 +191,7 @@ side_bar = dbc.Col(
                 dbc.Col(
                     dcc.Dropdown(
                         id="xaxis-column",
-                        options=[{"label": i, "value": i} for i in num_columns],
+                        options=[{"label": i, "value": i} for i in num_columns + ["country"]],
                         value="date",
                     )
                 ),
@@ -137,7 +210,7 @@ side_bar = dbc.Col(
                     dcc.Dropdown(
                         id="yaxis-column",
                         options=[{"label": i, "value": i} for i in num_columns],
-                        value="confirmed",
+                        value="confirmed_total",
                     )
                 ),
                 dbc.Col(
@@ -168,7 +241,7 @@ side_bar = dbc.Col(
                     dcc.Dropdown(
                         id="color-column",
                         options=[{"label": i, "value": i} for i in ["none"] + cat_columns],
-                        value="none",
+                        value="country",
                     )
                 ),
             ]
@@ -199,7 +272,7 @@ side_bar = dbc.Col(
         ),
         dbc.Row(
             [
-                dbc.Col(html.Label("Facet:"), width=side_bar_label_width),
+                dbc.Col(html.Label("Facet column:"), width=side_bar_label_width),
                 dbc.Col(
                     dcc.Dropdown(
                         id="facet-column",
@@ -209,7 +282,48 @@ side_bar = dbc.Col(
                 ),
             ]
         ),
-    ]
+        dbc.Row(
+            [
+                dbc.Col(html.Label("Facet col wrap:"), width=side_bar_label_width),
+                dbc.Col(
+                    dcc.Input(
+                        id="facet-column-wrap",
+                        value=4,
+                        type="number",
+                        debounce=True,
+                        min=1,
+                        step=1,
+                    ),
+                ),
+            ]
+        ),
+        dbc.Row(
+            [
+                dbc.Col(html.Label("Facet row:"), width=side_bar_label_width),
+                dbc.Col(
+                    dcc.Dropdown(
+                        id="facet-row",
+                        options=[{"label": i, "value": i} for i in ["none"] + cat_columns],
+                        value="none",
+                    )
+                ),
+            ]
+        ),
+        dbc.Row(
+            [
+                dbc.Col(html.Label("Graph type:"), width=side_bar_label_width),
+                dbc.Col(
+                    dcc.Dropdown(
+                        id="plot-type",
+                        options=[{"label": i, "value": i} for i in ["scatter", "bar", "line"]],
+                        value="scatter",
+                    )
+                ),
+            ]
+        ),
+        dbc.Row(html.Label("")),
+    ],
+    style=layout_style,
 )
 
 epoch = dt.utcfromtimestamp(0).date()
@@ -221,30 +335,31 @@ def unix_time_days(dt):
 
 body = dbc.Row(
     [
-        dbc.Col(side_bar, width=3),
+        dbc.Col(side_bar, style={"width": "22vw"}),
         dbc.Col(
             [
-                dbc.Row(dcc.Graph(id="output-graph")),
                 dbc.Row(
-                    [
-                        dbc.Col(html.Button("Play", id="bt_play"), width="auto"),
-                        dbc.Col(
-                            dcc.Slider(
-                                id="time-pos",
-                                min=unix_time_days(df.date.dt.date.min()),
-                                max=unix_time_days(df.date.dt.date.max()),
-                                marks={unix_time_days(i): f"{str(i)}" for i in df.date.dt.date},
-                                value=unix_time_days(df.date.dt.date.min()),
-                            )
-                        ),
-                    ]
+                    dcc.Graph(id="output-graph", style={"width": "98%"}),
+                    style={"width": "78vw", "height": "84vh"},
                 ),
-            ]
+                dbc.Row(
+                    dbc.Col(
+                        dcc.Slider(
+                            id="time-pos",
+                            min=unix_time_days(df.date.dt.date.min()),
+                            max=unix_time_days(df.date.dt.date.max()),
+                            marks={unix_time_days(i): f"{str(i)}" for i in df.date.dt.date},
+                            value=unix_time_days(df.date.dt.date.min()),
+                        )
+                    ),
+                ),
+            ],
+            style=layout_style,
         ),
-    ]
+    ],
 )
 
-app.layout = html.Div(children=[header, body])
+app.layout = html.Div(children=[header, body], style={"background-color": "#F9F9F9"},)
 
 
 @app.callback(
@@ -258,9 +373,12 @@ app.layout = html.Div(children=[header, body])
         Input("color-column", "value"),
         Input("size-column", "value"),
         Input("facet-column", "value"),
+        Input("facet-row", "value"),
+        Input("facet-column-wrap", "value"),
         Input("text-column", "value"),
         Input("time-pos", "value"),
         Input("filter-by-date", "value"),
+        Input("plot-type", "value"),
     ],
 )
 def update_figure(
@@ -271,13 +389,16 @@ def update_figure(
     log_y,
     color_column,
     dot_size,
-    facet,
+    facet_column,
+    facet_row,
+    facet_col_wrap,
     text_column,
     time_pos,
     filter_by_date,
+    plot_type,
 ):
     lcl_df = df[
-        df.country_region.isin(
+        df.country.isin(
             selected_countries if isinstance(selected_countries, list) else [selected_countries]
         )
     ]
@@ -293,7 +414,7 @@ def update_figure(
     else:
         rx = None
         ry = None
-    fig = px.scatter(
+    common_params = dict(
         data_frame=lcl_df,
         x=x_axis,
         log_x=log_x,
@@ -301,18 +422,24 @@ def update_figure(
         y=y_axis,
         log_y=log_y,
         range_y=ry,
-        animation_frame="date" if filter_by_date else None,
-        animation_group=color_column if color_column != "none" else None,
         color=color_column if color_column != "none" else None,
-        size=dot_size if dot_size != "none" else None,
-        size_max=60,
-        facet_row=facet if facet != "none" else None,
-        text=text_column if text_column != "none" else None,
-        width=1400,
-        height=800,
+        facet_row=facet_row if facet_row != "none" else None,
+        facet_col=facet_column if facet_column != "none" else None,
+        facet_col_wrap=facet_col_wrap,
     )
-    if filter_by_date:
-        fig.update_layout(transition={"duration": 1000})
+    if plot_type == "scatter":
+        fig = px.scatter(
+            **common_params,
+            size=dot_size if dot_size != "none" else None,
+            size_max=60,
+            text=text_column if text_column != "none" else None,
+        )
+        if filter_by_date:
+            fig.update_layout(transition={"duration": 500})
+    elif plot_type == "bar":
+        fig = px.bar(**common_params)
+    elif plot_type == "line":
+        fig = px.line(**common_params)
     return fig
 
 
