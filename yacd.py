@@ -417,19 +417,20 @@ def update_figure(
     common_params = dict(
         data_frame=lcl_df,
         x=x_axis,
-        log_x=log_x,
         range_x=rx,
         y=y_axis,
-        log_y=log_y,
         range_y=ry,
         color=color_column if color_column != "none" else None,
         facet_row=facet_row if facet_row != "none" else None,
         facet_col=facet_column if facet_column != "none" else None,
         facet_col_wrap=facet_col_wrap,
     )
+    lg_common = common_params.copy()
+    lg_common["log_x"] = log_x
+    lg_common["log_y"] = log_y
     if plot_type == "scatter":
         fig = px.scatter(
-            **common_params,
+            **lg_common,
             size=dot_size if dot_size != "none" else None,
             size_max=60,
             text=text_column if text_column != "none" else None,
@@ -439,7 +440,7 @@ def update_figure(
     elif plot_type == "bar":
         fig = px.bar(**common_params)
     elif plot_type == "line":
-        fig = px.line(**common_params)
+        fig = px.line(**lg_common)
     return fig
 
 
