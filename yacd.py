@@ -170,16 +170,7 @@ side_bar = dbc.Col(
                     dcc.Dropdown(
                         id="selected_countries",
                         options=[{"label": i, "value": i} for i in df.country.unique()],
-                        value=[
-                            "World",
-                            "France",
-                            "Spain",
-                            "Italy",
-                            "Germany",
-                            "US",
-                            "United Kingdom",
-                            "China",
-                        ],
+                        value=["France", "Spain", "Italy", "Germany", "US", "China",],
                         multi=True,
                     )
                 ),
