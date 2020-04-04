@@ -351,6 +351,7 @@ body = dbc.Row(
 )
 
 app.layout = html.Div(children=[header, body], style={"background-color": "#F9F9F9"},)
+server = app.server
 
 
 @app.callback(
