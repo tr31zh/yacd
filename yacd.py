@@ -19,13 +19,13 @@ df = get_wrangled_cssegis_df()
 
 external_stylesheets = dbc.themes.BOOTSTRAP
 
-# app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+# app = dash.Dash(__name__)
 app = dash.Dash(__name__, external_stylesheets=[external_stylesheets])
 
 layout_style = {
-    "border": "1px solid #B3B6B7",
+    # "border": "1px solid #B3B6B7",
     # "padding": "4px",
-    "background-color": "white",
+    # "background-color": "white",
 }
 text_layout = layout_style.copy()
 text_layout["text-align"] = "center"
@@ -93,19 +93,6 @@ side_bar = dbc.Col(
                     width=2,
                 ),
             ]
-        ),
-        dbc.Row(
-            dbc.Col(
-                dcc.Checklist(
-                    id="filter-by-date",
-                    options=[
-                        {
-                            "label": "Show one date only (use slider to change)",
-                            "value": "filter-date",
-                        },
-                    ],
-                ),
-            )
         ),
         dbc.Row(
             [
@@ -196,7 +183,7 @@ side_bar = dbc.Col(
         ),
         dbc.Row(html.Label("")),
     ],
-    style=layout_style,
+    # style=layout_style,
 )
 
 epoch = dt.utcfromtimestamp(0).date()
@@ -208,7 +195,12 @@ def unix_time_days(dt):
 
 body = dbc.Row(
     [
-        dbc.Col([dbc.Row(side_bar),]),
+        dbc.Col(
+            [
+                dbc.Row(side_bar),
+                # dbc.Table.from_dataframe(df.head(), striped=True, bordered=True, hover=True),
+            ]
+        ),
         dbc.Col(
             [
                 dbc.Row(
@@ -216,24 +208,40 @@ body = dbc.Row(
                     style={"width": "78vw", "height": "84vh"},
                 ),
                 dbc.Row(
-                    dbc.Col(
-                        dcc.Slider(
-                            id="time-pos",
-                            min=unix_time_days(df.date.dt.date.min()),
-                            max=unix_time_days(df.date.dt.date.max()),
-                            marks={unix_time_days(i): f"{str(i)}" for i in df.date.dt.date},
-                            value=unix_time_days(df.date.dt.date.min()),
-                        )
-                    ),
+                    [
+                        dbc.Col(
+                            dcc.Checklist(
+                                id="filter-by-date",
+                                options=[
+                                    {
+                                        "label": "Use slider to select date",
+                                        "value": "filter-date",
+                                    },
+                                ],
+                            ),
+                            width="auto",
+                        ),
+                        dbc.Col(
+                            dcc.Slider(
+                                id="time-pos",
+                                min=unix_time_days(df.date.dt.date.min()),
+                                max=unix_time_days(df.date.dt.date.max()),
+                                marks={unix_time_days(i): f"{str(i)}" for i in df.date.dt.date},
+                                value=unix_time_days(df.date.dt.date.min()),
+                            )
+                        ),
+                    ],
                 ),
             ],
-            style=layout_style,
+            # style=layout_style,
         ),
     ],
 )
 
 app.layout = html.Div(
-    children=dbc.Col([header, body, footer], width=12), style={"background-color": "#F9F9F9"},
+    children=dbc.Col(
+        [header, body, footer], width=12
+    )  # , style={"background-color": "#F9F9F9"},
 )
 server = app.server
 
@@ -300,6 +308,7 @@ def update_figure(
         facet_row=facet_row if facet_row != "none" else None,
         facet_col=facet_column if facet_column != "none" else None,
         facet_col_wrap=facet_col_wrap,
+        template="plotly_dark",
     )
     lg_common = common_params.copy()
     lg_common["log_x"] = log_x

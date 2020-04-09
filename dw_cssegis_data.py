@@ -110,8 +110,8 @@ def get_wrangled_cssegis_df():
     ]
 
     # Set recovered to int
-    df.recovered_total = df.recovered_total.fillna(-1)
-    df.recovered_total = pd.to_numeric(df.recovered_total, downcast="integer")
-    df.recovered_total = df.recovered_total.replace(-1, np.nan)
+    # df.recovered_total = df.recovered_total.fillna(-1)
+    # df.recovered_total = pd.to_numeric(df.recovered_total, downcast="integer")
+    # df.recovered_total = df.recovered_total.replace(-1, np.nan)
 
     return df
