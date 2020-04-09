@@ -29,6 +29,7 @@ layout_style = {
 }
 text_layout = layout_style.copy()
 text_layout["text-align"] = "center"
+text_layout["font-size"] = "50px"
 
 
 header = dbc.Row(
