@@ -187,6 +187,24 @@ side_bar = dbc.Col(
     # style=layout_style,
 )
 
+tab_height = "80vh"
+tabs = dcc.Tabs(
+    children=[
+        dcc.Tab(
+            dcc.Graph(id="output-graph", style={"width": "78vw", "height": tab_height}),
+            label="Plots",
+            value="tab-graph",
+        ),
+        dcc.Tab(
+            dcc.Graph(id="output-anim", style={"width": "78vw", "height": tab_height}),
+            label="Animations",
+            value="tab-animation",
+        ),
+    ],
+    id="tabs",
+    value="tab-graph",
+)
+
 epoch = dt.utcfromtimestamp(0).date()
 
 
@@ -194,50 +212,7 @@ def unix_time_days(dt):
     return (dt - epoch).total_seconds() // 86400
 
 
-body = dbc.Row(
-    [
-        dbc.Col(
-            [
-                dbc.Row(side_bar),
-                # dbc.Table.from_dataframe(df.head(), striped=True, bordered=True, hover=True),
-            ]
-        ),
-        dbc.Col(
-            [
-                dbc.Row(
-                    dcc.Graph(id="output-graph", style={"width": "98%"}),
-                    style={"width": "78vw", "height": "84vh"},
-                ),
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            dcc.Checklist(
-                                id="filter-by-date",
-                                options=[
-                                    {
-                                        "label": "Use slider to select date",
-                                        "value": "filter-date",
-                                    },
-                                ],
-                            ),
-                            width="auto",
-                        ),
-                        dbc.Col(
-                            dcc.Slider(
-                                id="time-pos",
-                                min=unix_time_days(df.date.dt.date.min()),
-                                max=unix_time_days(df.date.dt.date.max()),
-                                marks={unix_time_days(i): f"{str(i)}" for i in df.date.dt.date},
-                                value=unix_time_days(df.date.dt.date.min()),
-                            )
-                        ),
-                    ],
-                ),
-            ],
-            # style=layout_style,
-        ),
-    ],
-)
+body = dbc.Row([dbc.Col(dbc.Row(side_bar)), dbc.Col(tabs),],)
 
 app.layout = html.Div(
     children=dbc.Col(
@@ -261,12 +236,10 @@ server = app.server
         Input("facet-row", "value"),
         Input("facet-column-wrap", "value"),
         Input("text-column", "value"),
-        Input("time-pos", "value"),
-        Input("filter-by-date", "value"),
         Input("plot-type", "value"),
     ],
 )
-def update_figure(
+def update_static_plot(
     selected_countries,
     x_axis,
     log_x,
@@ -278,8 +251,6 @@ def update_figure(
     facet_row,
     facet_col_wrap,
     text_column,
-    time_pos,
-    filter_by_date,
     plot_type,
 ):
     lcl_df = df[
@@ -287,24 +258,10 @@ def update_figure(
             selected_countries if isinstance(selected_countries, list) else [selected_countries]
         )
     ]
-    if filter_by_date:
-        target_date = dt.strftime(
-            dt.utcfromtimestamp(0).date()
-            + timedelta(days=time_pos if time_pos is not None else 0),
-            "%Y-%m-%d",
-        )
-        rx = [lcl_df[x_axis].min(), lcl_df[x_axis].max()]
-        ry = [lcl_df[y_axis].min(), lcl_df[y_axis].max()]
-        lcl_df = lcl_df[lcl_df.date == target_date]
-    else:
-        rx = None
-        ry = None
     common_params = dict(
         data_frame=lcl_df,
         x=x_axis,
-        range_x=rx,
         y=y_axis,
-        range_y=ry,
         color=color_column if color_column != "none" else None,
         facet_row=facet_row if facet_row != "none" else None,
         facet_col=facet_column if facet_column != "none" else None,
@@ -321,8 +278,78 @@ def update_figure(
             size_max=60,
             text=text_column if text_column != "none" else None,
         )
-        if filter_by_date:
-            fig.update_layout(transition={"duration": 500})
+    elif plot_type == "bar":
+        fig = px.bar(**common_params)
+    elif plot_type == "line":
+        fig = px.line(**lg_common)
+    return fig
+
+
+@app.callback(
+    Output("output-anim", "figure"),
+    [
+        Input("selected_countries", "value"),
+        Input("xaxis-column", "value"),
+        Input("x-axis-type", "value"),
+        Input("yaxis-column", "value"),
+        Input("y-axis-type", "value"),
+        Input("color-column", "value"),
+        Input("size-column", "value"),
+        Input("facet-column", "value"),
+        Input("facet-row", "value"),
+        Input("facet-column-wrap", "value"),
+        Input("text-column", "value"),
+        Input("plot-type", "value"),
+        Input("tabs", "value"),
+    ],
+)
+def update_anim(
+    selected_countries,
+    x_axis,
+    log_x,
+    y_axis,
+    log_y,
+    color_column,
+    dot_size,
+    facet_column,
+    facet_row,
+    facet_col_wrap,
+    text_column,
+    plot_type,
+    active_tab,
+):
+    if active_tab != "tab-animation":
+        return {"data": []}
+    lcl_df = df[
+        df.country.isin(
+            selected_countries if isinstance(selected_countries, list) else [selected_countries]
+        )
+    ]
+    lcl_df = lcl_df.assign(animate_data=(lcl_df.date - lcl_df.date.min()).dt.days)
+    common_params = dict(
+        data_frame=lcl_df,
+        x=x_axis,
+        y=y_axis,
+        color=color_column if color_column != "none" else None,
+        facet_row=facet_row if facet_row != "none" else None,
+        facet_col=facet_column if facet_column != "none" else None,
+        facet_col_wrap=facet_col_wrap,
+        animation_frame="animate_data",
+        animation_group="country",
+        template="plotly_dark",
+        range_x=[0, lcl_df[x_axis].max()],
+        range_y=[0, lcl_df[y_axis].max()],
+    )
+    lg_common = common_params.copy()
+    lg_common["log_x"] = log_x
+    lg_common["log_y"] = log_y
+    if plot_type == "scatter":
+        fig = px.scatter(
+            **lg_common,
+            size=dot_size if dot_size != "none" else None,
+            size_max=60,
+            text=text_column if text_column != "none" else None,
+        )
     elif plot_type == "bar":
         fig = px.bar(**common_params)
     elif plot_type == "line":
