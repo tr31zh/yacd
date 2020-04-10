@@ -6,7 +6,7 @@ from datetime import timedelta
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 
 import dash_bootstrap_components as dbc
 
@@ -14,7 +14,7 @@ import plotly.express as px
 
 from dw_cssegis_data import get_wrangled_cssegis_df
 
-df = get_wrangled_cssegis_df()
+df = get_wrangled_cssegis_df(allow_cache=False)
 
 
 external_stylesheets = dbc.themes.BOOTSTRAP
@@ -43,6 +43,20 @@ all_columns = df.columns.to_list()
 num_columns = df.select_dtypes([np.int64, np.float64, np.datetime64]).columns.to_list()
 cat_columns = df.select_dtypes([np.object, np.datetime64]).columns.to_list()
 side_bar_label_width = 4
+available_templates = [
+    "ggplot2",
+    "seaborn",
+    "simple_white",
+    "plotly",
+    "plotly_white",
+    "plotly_dark",
+    "presentation",
+    "xgridoff",
+    "ygridoff",
+    "gridon",
+    "none",
+]
+
 side_bar = dbc.Col(
     [
         dbc.Row(html.Label("")),
@@ -69,12 +83,7 @@ side_bar = dbc.Col(
                         value="date",
                     )
                 ),
-                dbc.Col(
-                    dcc.Checklist(
-                        id="x-axis-type", options=[{"label": "Log", "value": "log-x"},],
-                    ),
-                    width=2,
-                ),
+                dbc.Col(dcc.Checklist(id="x-axis-type"), width="auto"),
             ]
         ),
         dbc.Row(
@@ -87,12 +96,7 @@ side_bar = dbc.Col(
                         value="confirmed_total",
                     )
                 ),
-                dbc.Col(
-                    dcc.Checklist(
-                        id="y-axis-type", options=[{"label": "Log", "value": "log-y"},],
-                    ),
-                    width=2,
-                ),
+                dbc.Col(dcc.Checklist(id="y-axis-type"), width="auto"),
             ]
         ),
         dbc.Row(
@@ -170,6 +174,19 @@ side_bar = dbc.Col(
                 ),
             ]
         ),
+        dbc.Row(html.Hr()),
+        dbc.Row(
+            [
+                dbc.Col(html.Label("Template:"), width=side_bar_label_width),
+                dbc.Col(
+                    dcc.Dropdown(
+                        id="selected-template",
+                        options=[{"label": i, "value": i} for i in available_templates],
+                        value="ggplot2",
+                    )
+                ),
+            ]
+        ),
         dbc.Row(
             [
                 dbc.Col(html.Label("Graph type:"), width=side_bar_label_width),
@@ -182,21 +199,44 @@ side_bar = dbc.Col(
                 ),
             ]
         ),
+        dbc.Row(html.Hr()),
+        dbc.Row(
+            html.Button(id="btn-submit-animation", n_clicks=0, children="Prepare animation"),
+            justify="end",
+        ),
+        dbc.Row(html.Label("")),
+        dbc.Row(
+            dbc.Alert(
+                [
+                    html.H4("About animations", className="alert-heading"),
+                    html.P(
+                        """Animations are enabled only when the corresponding 
+                     tab is selevted and graph type is set to scatter"""
+                    ),
+                    html.P(
+                        """Animations take long to compute,
+                    interractivity won't be enbaled until the page title goes back to 'YACD'"""
+                    ),
+                ],
+                color="primary",
+            )
+        ),
         dbc.Row(html.Label("")),
     ],
     # style=layout_style,
 )
 
 tab_height = "80vh"
+tab_width = "75vw"
 tabs = dcc.Tabs(
     children=[
         dcc.Tab(
-            dcc.Graph(id="output-graph", style={"width": "78vw", "height": tab_height}),
+            dcc.Graph(id="output-graph", style={"width": tab_width, "height": tab_height}),
             label="Plots",
             value="tab-graph",
         ),
         dcc.Tab(
-            dcc.Graph(id="output-anim", style={"width": "78vw", "height": tab_height}),
+            dcc.Graph(id="output-anim", style={"width": tab_width, "height": tab_height}),
             label="Animations",
             value="tab-animation",
         ),
@@ -215,11 +255,53 @@ def unix_time_days(dt):
 body = dbc.Row([dbc.Col(dbc.Row(side_bar)), dbc.Col(tabs),],)
 
 app.layout = html.Div(
-    children=dbc.Col(
-        [header, body, footer], width=12
-    )  # , style={"background-color": "#F9F9F9"},
+    children=dbc.Col([header, body, footer], width=12), style={"background-color": "#F9F9F9"},
 )
+app.title = "YACD"
 server = app.server
+
+
+@app.callback(
+    [Output("x-axis-type", "options"), Output("y-axis-type", "options")],
+    [Input("plot-type", "value")],
+)
+def update_log_state(plot_type):
+    return (
+        [{"label": "Log", "value": "log-x", "disabled": plot_type == "bar"},],
+        [{"label": "Log", "value": "log-y", "disabled": plot_type == "bar"},],
+    )
+
+
+@app.callback(
+    [Output("size-column", "disabled"), Output("text-column", "disabled")],
+    [Input("plot-type", "value")],
+)
+def update_scatter_only_state(plot_type):
+    return plot_type != "scatter", plot_type != "scatter"
+
+
+@app.callback(
+    [
+        Output("facet-column", "disabled"),
+        Output("facet-row", "disabled"),
+        Output("facet-column-wrap", "disabled"),
+    ],
+    [Input("tabs", "value")],
+)
+def update_facet_state(active_tab):
+    return (
+        active_tab == "tab-animation",  # facet-column
+        active_tab == "tab-animation",  # facet-row
+        active_tab == "tab-animation",  # facet-column-wrap
+    )
+
+
+@app.callback(
+    Output("btn-submit-animation", "disabled"),
+    [Input("tabs", "value"), Input("plot-type", "value")],
+)
+def update_bt_gen_anim_state(active_tab, plot_type):
+    return active_tab != "tab-animation" and plot_type == "scatter"
 
 
 @app.callback(
@@ -237,6 +319,7 @@ server = app.server
         Input("facet-column-wrap", "value"),
         Input("text-column", "value"),
         Input("plot-type", "value"),
+        Input("selected-template", "value"),
     ],
 )
 def update_static_plot(
@@ -252,7 +335,10 @@ def update_static_plot(
     facet_col_wrap,
     text_column,
     plot_type,
+    selected_template,
 ):
+    if not selected_countries:
+        return {"data": []}
     lcl_df = df[
         df.country.isin(
             selected_countries if isinstance(selected_countries, list) else [selected_countries]
@@ -266,7 +352,7 @@ def update_static_plot(
         facet_row=facet_row if facet_row != "none" else None,
         facet_col=facet_column if facet_column != "none" else None,
         facet_col_wrap=facet_col_wrap,
-        template="plotly_dark",
+        template=selected_template,
     )
     lg_common = common_params.copy()
     lg_common["log_x"] = log_x
@@ -287,23 +373,26 @@ def update_static_plot(
 
 @app.callback(
     Output("output-anim", "figure"),
+    [Input("btn-submit-animation", "n_clicks")],
     [
-        Input("selected_countries", "value"),
-        Input("xaxis-column", "value"),
-        Input("x-axis-type", "value"),
-        Input("yaxis-column", "value"),
-        Input("y-axis-type", "value"),
-        Input("color-column", "value"),
-        Input("size-column", "value"),
-        Input("facet-column", "value"),
-        Input("facet-row", "value"),
-        Input("facet-column-wrap", "value"),
-        Input("text-column", "value"),
-        Input("plot-type", "value"),
-        Input("tabs", "value"),
+        State("selected_countries", "value"),
+        State("xaxis-column", "value"),
+        State("x-axis-type", "value"),
+        State("yaxis-column", "value"),
+        State("y-axis-type", "value"),
+        State("color-column", "value"),
+        State("size-column", "value"),
+        State("facet-column", "value"),
+        State("facet-row", "value"),
+        State("facet-column-wrap", "value"),
+        State("text-column", "value"),
+        State("plot-type", "value"),
+        State("tabs", "value"),
+        State("selected-template", "value"),
     ],
 )
 def update_anim(
+    n_clicks,
     selected_countries,
     x_axis,
     log_x,
@@ -317,6 +406,7 @@ def update_anim(
     text_column,
     plot_type,
     active_tab,
+    selected_template,
 ):
     if active_tab != "tab-animation":
         return {"data": []}
@@ -336,9 +426,19 @@ def update_anim(
         facet_col_wrap=facet_col_wrap,
         animation_frame="animate_data",
         animation_group="country",
-        template="plotly_dark",
-        range_x=[0, lcl_df[x_axis].max()],
-        range_y=[0, lcl_df[y_axis].max()],
+        template=selected_template,
+        range_x=[
+            max(1, lcl_df[x_axis].min())
+            if log_x and (plot_type != "bar")
+            else lcl_df[x_axis].min(),
+            lcl_df[x_axis].max(),
+        ],
+        range_y=[
+            max(1, lcl_df[y_axis].min())
+            if log_y and (plot_type != "bar")
+            else lcl_df[y_axis].min(),
+            lcl_df[y_axis].max(),
+        ],
     )
     lg_common = common_params.copy()
     lg_common["log_x"] = log_x

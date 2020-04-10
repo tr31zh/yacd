@@ -1,45 +1,58 @@
 import pandas as pd
 import numpy as np
+import os
 
 root_url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
-confirmed_url = root_url + "time_series_covid19_confirmed_global.csv"
-dead_url = root_url + "time_series_covid19_deaths_global.csv"
-recovered_url = root_url + "time_series_covid19_recovered_global.csv"
+confirmed_url_base_name = "time_series_covid19_confirmed_global.csv"
+dead_url_base_name = "time_series_covid19_deaths_global.csv"
+recovered_url_base_name = "time_series_covid19_recovered_global.csv"
 
 
-def get_data_and_meld(url: str, val_name: str) -> pd.DataFrame:
+def get_data_and_meld(base_url: str, val_name: str, allow_cache: bool = False) -> pd.DataFrame:
     """Prepare a dataframe using an URL and a name for the column
     
     Arguments:
-        url {str} -- github raw link
+        base_url {str} -- file name
         val_name {str} -- name of the column
     
     Returns:
         DataFrame -- Built dataframe
     """
-    return (
-        pd.read_csv(url, error_bad_lines=False)
-        .rename(
-            columns={
-                "Province/State": "province_state",
-                "Country/Region": "country_region",
-                "Lat": "lat",
-                "Long": "long",
-            }
+    if allow_cache and os.path.isfile(os.path.join(".", "cached_data", base_url)):
+        return pd.read_csv(os.path.join(".", "cached_data", base_url))
+    else:
+        tmp_df = (
+            pd.read_csv(root_url + base_url, error_bad_lines=False)
+            .rename(
+                columns={
+                    "Province/State": "province_state",
+                    "Country/Region": "country_region",
+                    "Lat": "lat",
+                    "Long": "long",
+                }
+            )
+            .melt(
+                id_vars=["province_state", "country_region", "lat", "long"],
+                var_name="date",
+                value_name=val_name,
+            )
         )
-        .melt(
-            id_vars=["province_state", "country_region", "lat", "long"],
-            var_name="date",
-            value_name=val_name,
-        )
-    )
+        if allow_cache:
+            tmp_df.to_csv(os.path.join(".", "cached_data", base_url))
+        return tmp_df
 
 
-def get_wrangled_cssegis_df():
+def get_wrangled_cssegis_df(allow_cache: bool = False):
     # build the three root dataframes
-    df_confirmed = get_data_and_meld(url=confirmed_url, val_name="confirmed")
-    df_dead = get_data_and_meld(url=dead_url, val_name="dead")
-    df_recovered = get_data_and_meld(url=recovered_url, val_name="recovered")
+    df_confirmed = get_data_and_meld(
+        base_url=confirmed_url_base_name, val_name="confirmed", allow_cache=allow_cache
+    )
+    df_dead = get_data_and_meld(
+        base_url=dead_url_base_name, val_name="dead", allow_cache=allow_cache
+    )
+    df_recovered = get_data_and_meld(
+        base_url=recovered_url_base_name, val_name="recovered", allow_cache=allow_cache
+    )
 
     # Merge dataframes
     df_merged = (
