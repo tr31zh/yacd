@@ -211,11 +211,12 @@ side_bar = dbc.Col(
                     html.H4("About animations", className="alert-heading"),
                     html.P(
                         """Animations are enabled only when the corresponding 
-                     tab is selevted and graph type is set to scatter"""
+                     tab is selected and graph type is set to scatter or bar"""
                     ),
                     html.P(
                         """Animations take long to compute,
-                    interractivity won't be enbaled until the page title goes back to 'YACD'"""
+                    interractivity won't be enbaled until the page title (in the tab) 
+                    goes back to 'YACD' from 'Updating...'"""
                     ),
                 ],
                 color="primary",
@@ -382,9 +383,6 @@ def update_static_plot(
         State("y-axis-type", "value"),
         State("color-column", "value"),
         State("size-column", "value"),
-        State("facet-column", "value"),
-        State("facet-row", "value"),
-        State("facet-column-wrap", "value"),
         State("text-column", "value"),
         State("plot-type", "value"),
         State("tabs", "value"),
@@ -400,9 +398,6 @@ def update_anim(
     log_y,
     color_column,
     dot_size,
-    facet_column,
-    facet_row,
-    facet_col_wrap,
     text_column,
     plot_type,
     active_tab,
@@ -421,9 +416,6 @@ def update_anim(
         x=x_axis,
         y=y_axis,
         color=color_column if color_column != "none" else None,
-        facet_row=facet_row if facet_row != "none" else None,
-        facet_col=facet_column if facet_column != "none" else None,
-        facet_col_wrap=facet_col_wrap,
         animation_frame="animate_data",
         animation_group="country",
         template=selected_template,

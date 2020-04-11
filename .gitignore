@@ -133,3 +133,5 @@ dmypy.json
 
 # My files
 cached_data/
+old_assets/
+assets/
