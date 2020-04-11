@@ -199,51 +199,71 @@ side_bar = dbc.Col(
                 ),
             ]
         ),
-        dbc.Row(html.Hr()),
-        dbc.Row(
-            html.Button(id="btn-submit-animation", n_clicks=0, children="Prepare animation"),
-            justify="end",
-        ),
-        dbc.Row(html.Label("")),
-        dbc.Row(
-            dbc.Alert(
-                [
-                    html.H4("About animations", className="alert-heading"),
-                    html.P(
-                        """Animations are enabled only when the corresponding 
-                     tab is selected and graph type is set to scatter or bar"""
-                    ),
-                    html.P(
-                        """Animations take long to compute,
-                    interractivity won't be enbaled until the page title (in the tab) 
-                    goes back to 'YACD' from 'Updating...'"""
-                    ),
-                ],
-                color="primary",
-            )
-        ),
-        dbc.Row(html.Label("")),
     ],
-    # style=layout_style,
 )
 
-tab_height = "80vh"
-tab_width = "75vw"
+tabs_styles = {"height": "44px"}
+tab_style = {"borderBottom": "1px solid #d6d6d6", "padding": "6px", "fontWeight": "bold"}
+
+tab_selected_style = {
+    "borderTop": "1px solid #d6d6d6",
+    "borderBottom": "1px solid #d6d6d6",
+    "backgroundColor": "#119DFF",
+    "color": "white",
+    "padding": "6px",
+}
+
 tabs = dcc.Tabs(
     children=[
         dcc.Tab(
-            dcc.Graph(id="output-graph", style={"width": tab_width, "height": tab_height}),
-            label="Plots",
+            dbc.Row(
+                dbc.Col(dcc.Graph(id="output-graph", style={"width": "100%", "height": "83vh"}))
+            ),
+            label="Static Plots",
             value="tab-graph",
+            style=tab_style,
+            selected_style=tab_selected_style,
         ),
         dcc.Tab(
-            dcc.Graph(id="output-anim", style={"width": tab_width, "height": tab_height}),
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            dbc.Alert(
+                                [
+                                    html.P(
+                                        """Animations take long to compute,
+                                    after pressing the 'Prepare animation' button, 
+                                    please wait until the site title (in the tab) 
+                                    goes back to 'YACD' from 'Updating...' 
+                                    before launching playback"""
+                                    ),
+                                ],
+                                color="primary",
+                            )
+                        ),
+                        dbc.Col(
+                            html.Button(
+                                id="btn-submit-animation",
+                                n_clicks=0,
+                                children="Prepare animation",
+                            ),
+                            width=2,
+                        ),
+                    ],
+                    style={"width": "100%"},
+                ),
+                dbc.Row(dcc.Graph(id="output-anim", style={"width": "100%", "height": "74vh"})),
+            ],
             label="Animations",
             value="tab-animation",
+            style=tab_style,
+            selected_style=tab_selected_style,
         ),
     ],
     id="tabs",
     value="tab-graph",
+    style=tabs_styles,
 )
 
 epoch = dt.utcfromtimestamp(0).date()
@@ -253,7 +273,7 @@ def unix_time_days(dt):
     return (dt - epoch).total_seconds() // 86400
 
 
-body = dbc.Row([dbc.Col(dbc.Row(side_bar)), dbc.Col(tabs),],)
+body = dbc.Row([dbc.Col(dbc.Row(side_bar), width=3), dbc.Col(tabs, width=9),],)
 
 app.layout = html.Div(
     children=dbc.Col([header, body, footer], width=12), style={"background-color": "#F9F9F9"},
@@ -279,6 +299,13 @@ def update_log_state(plot_type):
 )
 def update_scatter_only_state(plot_type):
     return plot_type != "scatter", plot_type != "scatter"
+
+
+@app.callback(
+    Output("xaxis-column", "value"), [Input("tabs", "value")],
+)
+def update_x_axis_value(active_tab):
+    return "country" if active_tab == "tab-animation" else "date"
 
 
 @app.callback(
