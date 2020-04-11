@@ -2,7 +2,8 @@
 
 ## Intro
 
-Yet another COVID-19 dashboard
+Yet another COVID-19 dashboard  
+You can find this app here http://yacd.herokuapp.com/
 
 ## Description
 
