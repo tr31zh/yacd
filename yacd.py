@@ -67,7 +67,7 @@ side_bar = dbc.Col(
                     dcc.Dropdown(
                         id="selected_countries",
                         options=[{"label": i, "value": i} for i in df.country.unique()],
-                        value=["France", "Spain", "Italy", "Germany", "US", "China",],
+                        value=["World",],
                         multi=True,
                     )
                 ),
@@ -199,6 +199,28 @@ side_bar = dbc.Col(
                 ),
             ]
         ),
+        dbc.Row(html.Hr()),
+        dbc.Row(
+            dbc.Alert(
+                [
+                    html.H4("Some tips.", className="alert-heading"),
+                    html.Ul(
+                        [
+                            html.Li(
+                                """Any number of conutries can be selected at the same time.""",
+                            ),
+                            html.Li("""Click on the 'animations' for animated plots.""",),
+                            html.Li("""Not all settings combinations make sense.""",),
+                            html.Li(
+                                """At the moment lines and animations don't work together.""",
+                            ),
+                        ]
+                    ),
+                ],
+                color="info",
+            ),
+            justify="center",
+        ),
     ],
 )
 
@@ -232,14 +254,16 @@ tabs = dcc.Tabs(
                             dbc.Alert(
                                 [
                                     html.P(
-                                        """Animations take long to compute,
-                                    after pressing the 'Prepare animation' button, 
-                                    please wait until the site title (in the tab) 
-                                    goes back to 'YACD' from 'Updating...' 
-                                    before launching playback"""
+                                        """Animations take long to compute, so there're 
+                                        updated with the current settings, 
+                                        only when the 'Prepare animation' button is pressed, 
+                                        after that, please wait until the site title (in the tab) 
+                                        goes back to 'YACD' from 'Updating...' before launching playback. 
+                                        Line graph type is disabled for animations""",
+                                        style={"font-size": 12},
                                     ),
                                 ],
-                                color="primary",
+                                color="warning",
                             )
                         ),
                         dbc.Col(
