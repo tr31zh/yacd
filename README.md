@@ -3,7 +3,8 @@
 ## Intro
 
 Yet another COVID-19 dashboard  
-You can find this app here http://yacd.herokuapp.com/
+You can find this app here http://yacd.herokuapp.com/  
+The raw data is extracted from https://github.com/CSSEGISandData/COVID-19
 
 ## Description
 
